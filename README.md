@@ -5,13 +5,14 @@ A TypeScript system for efficiently managing API calls to multiple Large Languag
 ## Features
 
 - **Smart Routing**: Intelligently routes requests to the most appropriate LLM based on task complexity, cost, and performance requirements
-- **Multi-Provider Support**: Built-in support for OpenAI, Anthropic (Claude), and Google (Gemini) with an extensible architecture
+- **Multi-Provider Support**: Built-in support for OpenAI (GPT-3.5), Anthropic (Claude Sonnet), and Google (Gemini Flash)
 - **Dynamic Fallback**: Configurable fallback mechanisms when a provider is unavailable or returns an error
 - **Semantic Caching**: Reduces redundant API calls by caching responses and identifying semantically similar queries
-- **Cost Optimization**: Implements the FrugalGPT approach to minimize costs without compromising quality
+- **Cost Optimization**: Implements cost-aware routing to minimize API expenses
 - **Task Complexity Analysis**: Automatically categorizes queries by complexity to route them appropriately
+- **Rate Limiting**: Built-in rate limiting and retry logic to handle API throttling
 
-##  Installation
+## Installation
 
 ```bash
 # Clone the repository
@@ -26,7 +27,7 @@ cp .env.example .env
 # Edit .env with your API keys
 ```
 
-##  Configuration
+## Configuration
 
 Create a `.env` file with your API keys:
 
@@ -44,26 +45,39 @@ GOOGLE_API_KEY=your-google-api-key
 import { LLMRouter } from './services/llm-router';
 import { OpenAIProvider } from './models/providers/openai-provider';
 import { ClaudeProvider } from './models/providers/claude-provider';
+import { GeminiProvider } from './models/providers/gemini-provider';
 import { defaultModelConfigs } from './config/model-configs';
 
 async function example() {
   // Initialize router
   const router = new LLMRouter();
   
-  // Set up providers
-  const openai = new OpenAIProvider(process.env.OPENAI_API_KEY!);
-  const claude = new ClaudeProvider(process.env.ANTHROPIC_API_KEY!);
+  // Set up providers (only if API keys are available)
+  if (process.env.OPENAI_API_KEY) {
+    const openai = new OpenAIProvider(process.env.OPENAI_API_KEY);
+    router.registerProviders([
+      { provider: openai, config: defaultModelConfigs.find(m => m.name === 'gpt-3.5-turbo')! }
+    ]);
+  }
   
-  // Register models
-  router.registerProviders([
-    { provider: openai, config: defaultModelConfigs.find(m => m.name === 'gpt-4-turbo')! },
-    { provider: claude, config: defaultModelConfigs.find(m => m.name === 'claude-3-7-sonnet')! }
-  ]);
+  if (process.env.ANTHROPIC_API_KEY) {
+    const claude = new ClaudeProvider(process.env.ANTHROPIC_API_KEY);
+    router.registerProviders([
+      { provider: claude, config: defaultModelConfigs.find(m => m.name === 'claude-3-7-sonnet')! }
+    ]);
+  }
+  
+  if (process.env.GOOGLE_API_KEY) {
+    const gemini = new GeminiProvider(process.env.GOOGLE_API_KEY);
+    router.registerProviders([
+      { provider: gemini, config: defaultModelConfigs.find(m => m.name === 'gemini-1.5-flash')! }
+    ]);
+  }
   
   // Process a prompt
   const result = await router.processPrompt("Explain quantum computing in simple terms");
-  console.log(`Model used: ${result.modelUsed}`);
-  console.log(result.content);
+  console.log(`Model used: ${result.model}`);
+  console.log(result.text);
 }
 ```
 
@@ -72,9 +86,10 @@ async function example() {
 ```typescript
 const options = {
   preferredProvider: 'anthropic',
-  minCapability: { reasoning: 9 },
+  minCapability: { reasoning: 8 },
   fallbackStrategy: 'capability-descending',
-  cacheResults: true
+  cacheResults: true,
+  timeoutMs: 30000 // 30 seconds timeout
 };
 
 const response = await router.processPrompt(
@@ -98,6 +113,19 @@ const response = await router.processPrompt(
 );
 ```
 
+## Available Models
+
+The system currently supports these models:
+
+1. **OpenAI**
+   - GPT-3.5 Turbo (default)
+
+2. **Anthropic**
+   - Claude 3.7 Sonnet (default)
+
+3. **Google**
+   - Gemini 1.5 Flash (default)
+
 ## Routing Strategies
 
 The system supports several routing strategies:
@@ -118,7 +146,7 @@ The system supports several routing strategies:
 ├── models/
 │   ├── types.ts              # Type definitions
 │   └── providers/
-│       ├── base-provider.ts  # Abstract base provider class
+│       ├── base-provider.ts  # Abstract base provider class with rate limiting
 │       ├── openai-provider.ts
 │       ├── claude-provider.ts
 │       └── gemini-provider.ts
@@ -131,6 +159,25 @@ The system supports several routing strategies:
 └── utils/
     └── vector-utils.ts       # Utility functions for embeddings
 ```
+
+## Features in Detail
+
+### Rate Limiting and Retries
+- Automatic rate limiting (1 request per second minimum)
+- Exponential backoff retry logic (up to 3 retries)
+- Respects API-provided retry-after headers
+- Configurable timeouts and retry delays
+
+### Task Classification
+- Pattern-based complexity detection
+- Length-based fallback classification
+- Support for simple, moderate, and complex tasks
+
+### Caching
+- Exact match caching
+- Semantic similarity caching
+- Configurable TTL (Time To Live)
+- Automatic cache cleanup
 
 ## Example Use Cases
 
