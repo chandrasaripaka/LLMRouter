@@ -1,5 +1,3 @@
-// index.ts - Usage example
-  
 import { LLMRouter } from './services/llm-router';
 import { OpenAIProvider } from './models/providers/openai-provider';
 import { ClaudeProvider } from './models/providers/claude-provider';
