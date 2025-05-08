@@ -1,5 +1,4 @@
 // Dynamic LLM Router - A system to efficiently switch between different LLM providers
-// models/types.ts
 
 // Define the common response structure from any LLM provider
 export interface LLMResponse {
