@@ -1,26 +1,28 @@
 import { LLMProvider } from './base-provider';
-import { LLMResponse, RequestOptions } from '../types';
+import { LLMResponse, RequestOptions, TokenCount } from '../types';
 
 export class GeminiProvider extends LLMProvider {
-  constructor(apiKey: string, modelName: string = 'gemini-1.5-flash') {
-    super(apiKey, 'https://generativelanguage.googleapis.com/v1', modelName);
+  protected readonly baseUrl = 'https://generativelanguage.googleapis.com/v1';
+  protected readonly defaultTimeout = 30000;
+
+  constructor(apiKey: string) {
+    super(apiKey, 'gemini-1.5-flash', 'https://generativelanguage.googleapis.com/v1');
   }
 
-  async generateCompletion(prompt: string, options: RequestOptions = {}): Promise<LLMResponse> {
+  async generateCompletion(prompt: string, options?: RequestOptions): Promise<LLMResponse> {
     try {
       this.validatePrompt(prompt);
 
       const response = await this.makeRequest<any>(
-        `/models/${this.modelName}:generateContent?key=${this.apiKey}`,
+        `${this.baseUrl}/models/${options?.model || this.modelName}:generateContent`,
         'POST',
         {
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            maxOutputTokens: options.maxTokens || 1024,
-            temperature: options.temperature,
-            topP: options.topP,
-            candidateCount: options.candidateCount,
-            safetySettings: options.safetySettings
+            temperature: options?.temperature || 0.7,
+            maxOutputTokens: options?.maxTokens || 1000,
+            topP: options?.topP || 0.95,
+            topK: options?.topK || 40
           }
         },
         options
@@ -28,48 +30,50 @@ export class GeminiProvider extends LLMProvider {
 
       return {
         text: response.candidates[0].content.parts[0].text,
-        model: this.modelName,
+        model: options?.model || this.modelName,
         provider: 'google',
         usage: {
-          promptTokens: response.usage?.promptTokenCount || 0,
-          completionTokens: response.usage?.candidatesTokenCount || 0,
-          totalTokens: (response.usage?.promptTokenCount || 0) + (response.usage?.candidatesTokenCount || 0)
+          promptTokens: response.usageMetadata.promptTokenCount,
+          completionTokens: response.usageMetadata.candidatesTokenCount,
+          totalTokens: response.usageMetadata.totalTokenCount
         },
         metadata: {
-          id: response.candidates[0].citationMetadata?.citationSources?.[0]?.uri || ''
+          safetyRatings: response.candidates[0].safetyRatings
         }
       };
     } catch (error) {
-      if (error instanceof Error) {
-        return this.createErrorResponse(error);
-      }
-      return this.createErrorResponse(new Error('An unknown error occurred'));
+      console.log('Error in Gemini completion:', error instanceof Error ? error.message : 'Unknown error');
+      return this.createResponse(
+        `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+        { error: true }
+      );
     }
   }
 
   async generateEmbedding(text: string): Promise<number[]> {
     try {
-      this.validatePrompt(text);
+      this.validateText(text);
 
       const response = await this.makeRequest<any>(
-        `/models/${this.modelName}:embedContent?key=${this.apiKey}`,
+        `${this.baseUrl}/models/embedding-001:embedContent`,
         'POST',
         {
+          model: 'embedding-001',
           content: { parts: [{ text }] }
         }
       );
 
       return response.embedding.values;
     } catch (error) {
-      if (error instanceof Error) {
-        throw error;
-      }
-      throw new Error('Failed to generate embedding');
+      console.log('Error in Gemini embedding:', error instanceof Error ? error.message : 'Unknown error');
+      throw error;
     }
   }
 
-  calculateTokens(text: string): { input: number; output?: number } {
-    // Simple approximation: ~4 chars per token for English text
+  calculateTokens(text: string): TokenCount {
+    // Simple approximation: 1 token ≈ 4 characters for English text
+    console.log('Calculating tokens using character approximation');
     const approxTokens = Math.ceil(text.length / 4);
     return { input: approxTokens };
   }

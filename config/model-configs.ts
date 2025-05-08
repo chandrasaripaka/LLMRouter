@@ -11,7 +11,8 @@ export const defaultModelConfigs: ModelConfig[] = [
       creativity: 8
     },
     costPerInputToken: 0.000001,
-    costPerOutputToken: 0.000002
+    costPerOutputToken: 0.000002,
+    maxContextTokens: 16384
   },
   {
     provider: 'anthropic',
@@ -23,7 +24,8 @@ export const defaultModelConfigs: ModelConfig[] = [
       creativity: 8
     },
     costPerInputToken: 0.000005,
-    costPerOutputToken: 0.000015
+    costPerOutputToken: 0.000015,
+    maxContextTokens: 200000
   },
   {
     provider: 'google',
@@ -35,6 +37,7 @@ export const defaultModelConfigs: ModelConfig[] = [
       creativity: 7
     },
     costPerInputToken: 0.000001,
-    costPerOutputToken: 0.000002
+    costPerOutputToken: 0.000002,
+    maxContextTokens: 128000
   }
 ];

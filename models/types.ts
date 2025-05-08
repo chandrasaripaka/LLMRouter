@@ -6,17 +6,12 @@ export interface LLMResponse {
     text: string;
     model: string;
     provider: string;
-    usage?: {
+    usage: {
       promptTokens: number;
       completionTokens: number;
       totalTokens: number;
     };
-    metadata?: {
-      id?: string;
-      provider?: string;
-      created?: number;
-      [key: string]: any; // Allow additional metadata fields
-    };
+    metadata?: Record<string, any>;
   }
   
   // Define the complexity level of a prompt
@@ -33,34 +28,24 @@ export interface LLMResponse {
     capabilities: ModelCapabilities;
     costPerInputToken: number;
     costPerOutputToken: number;
+    maxContextTokens: number;
   }
   
   // Define the request options
   export interface RequestOptions {
-    preferredProvider?: string;
+    model?: string;
     preferredModel?: string;
-    minCapability?: Partial<ModelCapabilities>;
-    maxCost?: number;
-    fallbackStrategy?: 'cost-ascending' | 'capability-descending' | 'specific-models';
-    fallbackModels?: string[];
-    timeoutMs?: number;
-    cacheResults?: boolean;
-    headers?: Record<string, string>;
-    // OpenAI specific options
+    preferredProvider?: string;
     temperature?: number;
     maxTokens?: number;
     topP?: number;
-    frequencyPenalty?: number;
-    presencePenalty?: number;
-    // Claude specific options
-    maxTokensToSample?: number;
-    stopSequences?: string[];
-    // Gemini specific options
-    candidateCount?: number;
-    safetySettings?: Array<{
-      category: string;
-      threshold: string;
-    }>;
+    topK?: number;
+    timeoutMs?: number;
+    headers?: Record<string, string>;
+    maxCost?: number;
+    minCapability?: Partial<ModelCapabilities>;
+    fallbackStrategy?: 'cost-ascending' | 'capability-descending' | 'specific-models';
+    fallbackModels?: string[];
   }
   
   // Cache interface
@@ -79,8 +64,7 @@ export interface LLMResponse {
     creativity: number;
   }
 
-  export interface TokenUsage {
+  export interface TokenCount {
     input: number;
-    output: number;
-    total: number;
+    output?: number;
   }

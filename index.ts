@@ -14,7 +14,7 @@ import cors from 'cors';
 dotenv.config();
 
 async function main() {
-  // Initialize router
+  console.log('Initializing router');
   const router = new LLMRouter();
 
   // Initialize providers with API keys and register them if keys are present
@@ -23,6 +23,7 @@ async function main() {
   const geminiKey = process.env.GOOGLE_API_KEY;
 
   if (openaiKey) {
+    console.log('Initializing OpenAI provider');
     const openaiProvider = new OpenAIProvider(openaiKey);
     router.registerProviders([
       { provider: openaiProvider, config: defaultModelConfigs[0] }  // GPT-3.5
@@ -30,6 +31,7 @@ async function main() {
   }
 
   if (claudeKey) {
+    console.log('Initializing Claude provider');
     const claudeProvider = new ClaudeProvider(claudeKey);
     router.registerProviders([
       { provider: claudeProvider, config: defaultModelConfigs[1] }  // Claude Sonnet
@@ -37,21 +39,20 @@ async function main() {
   }
 
   if (geminiKey) {
+    console.log('Initializing Gemini provider');
     const geminiProvider = new GeminiProvider(geminiKey);
     router.registerProviders([
       { provider: geminiProvider, config: defaultModelConfigs[2] }  // Gemini Flash
     ]);
   }
 
-  // Test 1: Simple task with default settings
-  console.log("\nTest 1: Simple task with default settings");
+  console.log('\nTest 1: Simple task with default settings');
   const response1 = await router.processPrompt("What is the capital of France?");
   console.log("Response:", response1.text);
   console.log("Model used:", response1.model);
   console.log("Token usage:", response1.usage);
 
-  // Test 2: Complex task with specific model
-  console.log("\nTest 2: Complex task with specific model");
+  console.log('\nTest 2: Complex task with specific model');
   const response2 = await router.processPrompt(
     "Analyze the ethical implications of artificial intelligence in healthcare, considering both benefits and potential risks.",
     { preferredModel: "gpt-3.5-turbo" }
@@ -60,8 +61,7 @@ async function main() {
   console.log("Model used:", response2.model);
   console.log("Token usage:", response2.usage);
 
-  // Test 3: Cost-constrained task
-  console.log("\nTest 3: Cost-constrained task");
+  console.log('\nTest 3: Cost-constrained task');
   const response3 = await router.processPrompt(
     "Write a short poem about programming.",
     { maxCost: 0.001, fallbackStrategy: "cost-ascending" }
@@ -70,8 +70,7 @@ async function main() {
   console.log("Model used:", response3.model);
   console.log("Token usage:", response3.usage);
 
-  // Test 4: Capability-focused task
-  console.log("\nTest 4: Capability-focused task");
+  console.log('\nTest 4: Capability-focused task');
   const response4 = await router.processPrompt(
     "Create a comprehensive guide on implementing a microservices architecture.",
     {
@@ -96,6 +95,7 @@ async function main() {
 }
 
 async function startServer() {
+  console.log('Starting server');
   const app = express();
   const port = process.env.PORT || 3000;
   
@@ -107,6 +107,7 @@ async function startServer() {
   const geminiKey = process.env.GOOGLE_API_KEY;
 
   if (openaiKey) {
+    console.log('Initializing OpenAI provider for server');
     const openai = new OpenAIProvider(openaiKey);
     router.registerProviders([
       { provider: openai, config: defaultModelConfigs.find(m => m.provider === 'openai' && m.name === 'gpt-3.5-turbo')! }
@@ -114,6 +115,7 @@ async function startServer() {
   }
   
   if (claudeKey) {
+    console.log('Initializing Claude provider for server');
     const claude = new ClaudeProvider(claudeKey);
     router.registerProviders([
       { provider: claude, config: defaultModelConfigs.find(m => m.provider === 'anthropic' && m.name === 'claude-3-7-sonnet')! }
@@ -121,6 +123,7 @@ async function startServer() {
   }
   
   if (geminiKey) {
+    console.log('Initializing Gemini provider for server');
     const gemini = new GeminiProvider(geminiKey);
     router.registerProviders([
       { provider: gemini, config: defaultModelConfigs.find(m => m.provider === 'google' && m.name === 'gemini-1.5-flash')! }

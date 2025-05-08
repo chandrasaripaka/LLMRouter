@@ -1,37 +1,34 @@
 import { LLMProvider } from './base-provider';
-import { LLMResponse, RequestOptions } from '../types';
+import { LLMResponse, RequestOptions, TokenCount } from '../types';
 
 export class ClaudeProvider extends LLMProvider {
-  constructor(apiKey: string, modelName: string = 'claude-3-7-sonnet') {
-    super(apiKey, 'https://api.anthropic.com/v1', modelName);
+  protected readonly baseUrl = 'https://api.anthropic.com/v1';
+  protected readonly defaultTimeout = 30000;
+
+  constructor(apiKey: string) {
+    super(apiKey, 'claude-3-7-sonnet', 'https://api.anthropic.com/v1');
   }
 
-  async generateCompletion(prompt: string, options: RequestOptions = {}): Promise<LLMResponse> {
+  async generateCompletion(prompt: string, options?: RequestOptions): Promise<LLMResponse> {
     try {
       this.validatePrompt(prompt);
 
       const response = await this.makeRequest<any>(
-        '/messages',
+        `${this.baseUrl}/messages`,
         'POST',
         {
-          model: this.modelName,
+          model: options?.model || this.modelName,
           messages: [{ role: 'user', content: prompt }],
-          max_tokens: options.maxTokensToSample || 1024,
-          temperature: options.temperature,
-          top_p: options.topP,
-          stop_sequences: options.stopSequences
+          temperature: options?.temperature || 0.7,
+          max_tokens: options?.maxTokens || 1000,
+          stream: false
         },
-        {
-          ...options,
-          headers: {
-            'anthropic-version': '2023-06-01'
-          }
-        }
+        options
       );
 
       return {
         text: response.content[0].text,
-        model: this.modelName,
+        model: response.model,
         provider: 'anthropic',
         usage: {
           promptTokens: response.usage.input_tokens,
@@ -39,43 +36,42 @@ export class ClaudeProvider extends LLMProvider {
           totalTokens: response.usage.input_tokens + response.usage.output_tokens
         },
         metadata: {
-          id: response.id
+          stopReason: response.stop_reason
         }
       };
     } catch (error) {
-      if (error instanceof Error) {
-        return this.createErrorResponse(error);
-      }
-      return this.createErrorResponse(new Error('An unknown error occurred'));
+      console.log('Error in Claude completion:', error instanceof Error ? error.message : 'Unknown error');
+      return this.createResponse(
+        `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+        { error: true }
+      );
     }
   }
 
   async generateEmbedding(text: string): Promise<number[]> {
-    // Claude doesn't have a native embedding API, so we'll use a proxy service
-    // In a production environment, you might use another service or implement a solution
     try {
-      this.validatePrompt(text);
+      this.validateText(text);
 
       const response = await this.makeRequest<any>(
-        'https://api.embeddings-as-service.com/v1/embed',
+        `${this.baseUrl}/embeddings`,
         'POST',
         {
-          text: text,
-          model: 'claude-embedding'
+          model: 'claude-3-sonnet-20240229',
+          input: text
         }
       );
 
       return response.embedding;
     } catch (error) {
-      if (error instanceof Error) {
-        throw error;
-      }
-      throw new Error('Failed to generate embedding');
+      console.log('Error in Claude embedding:', error instanceof Error ? error.message : 'Unknown error');
+      throw error;
     }
   }
 
-  calculateTokens(text: string): { input: number; output?: number } {
-    // Simple approximation: ~4 chars per token for English text
+  calculateTokens(text: string): TokenCount {
+    // Simple approximation: 1 token ≈ 4 characters for English text
+    console.log('Calculating tokens using character approximation');
     const approxTokens = Math.ceil(text.length / 4);
     return { input: approxTokens };
   }
