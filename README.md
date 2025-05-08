@@ -25,6 +25,11 @@ npm install
 # Set up environment variables
 cp .env.example .env
 # Edit .env with your API keys
+
+#Also if you feel like just running it after putting the keys below, there is a index.ts,
+which mimicks asking questions.,
+npm install
+npm start
 ```
 
 ## Configuration
@@ -35,6 +40,7 @@ Create a `.env` file with your API keys:
 OPENAI_API_KEY=your-openai-api-key
 ANTHROPIC_API_KEY=your-anthropic-api-key
 GOOGLE_API_KEY=your-google-api-key
+PORT=3000
 ```
 
 ## Usage
