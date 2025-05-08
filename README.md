@@ -16,7 +16,7 @@ A TypeScript system for efficiently managing API calls to multiple Large Languag
 ```bash
 # Clone the repository
 git clone https://github.com/chandrasaripaka/LLMRouter.git
-cd llm-router
+cd LLMRouter
 
 # Install dependencies
 npm install
