@@ -1,5 +1,3 @@
-// services/cache-service.ts
-
 import { CacheEntry } from '../models/types';
 import { cosineSimilarity } from '../utils/vector-utils';
 
