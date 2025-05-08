@@ -1,6 +1,6 @@
 # Dynamic LLM Router
 
-A TypeScript system for efficiently managing API calls to multiple Large Language Models (LLMs) with intelligent routing, fallback mechanisms, and caching strategies.
+A system for efficiently managing API calls to multiple Large Language Models (LLMs) with intelligent routing, fallback mechanisms, and caching strategies.
 
 ## Features
 
