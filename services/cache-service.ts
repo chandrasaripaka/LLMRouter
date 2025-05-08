@@ -1,76 +1,100 @@
-import { CacheEntry } from '../models/types';
-import { cosineSimilarity } from '../utils/vector-utils';
+// services/cache-service.ts
+
+import { LLMResponse } from '../models/types';
+
+interface CacheEntry {
+  prompt: string;
+  response: LLMResponse;
+  embedding?: number[];
+  timestamp: number;
+  expiresAt: number;
+}
 
 export class CacheService {
   private cache: Map<string, CacheEntry> = new Map();
-  private semanticCache: CacheEntry[] = [];
-  private readonly similarityThreshold: number;
-  private readonly defaultExpiration: number; // in milliseconds
+  private semanticCache: Array<{ embedding: number[]; response: LLMResponse; timestamp: number; expiresAt: number }> = [];
+  private defaultTTL: number = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
-  constructor(similarityThreshold: number = 0.95, defaultExpiration: number = 24 * 60 * 60 * 1000) {
-    this.similarityThreshold = similarityThreshold;
-    this.defaultExpiration = defaultExpiration;
-    
-    // Cleanup expired entries periodically
-    setInterval(() => this.cleanupExpiredEntries(), 60 * 60 * 1000); // Every hour
-  }
-
-  set(key: string, prompt: string, response: any, embedding?: number[], expirationMs?: number): void {
-    const entry: CacheEntry = {
-      prompt,
-      response,
-      embedding,
-      timestamp: Date.now(),
-      expiresAt: Date.now() + (expirationMs || this.defaultExpiration)
-    };
-    
-    this.cache.set(key, entry);
-    
-    if (embedding) {
-      this.semanticCache.push(entry);
+  constructor(defaultTTL?: number) {
+    if (defaultTTL) {
+      this.defaultTTL = defaultTTL;
     }
   }
 
-  get(key: string): any | null {
+  get(key: string): LLMResponse | undefined {
     const entry = this.cache.get(key);
-    if (!entry || Date.now() > entry.expiresAt) {
-      if (entry) this.cache.delete(key);
-      return null;
+    if (!entry) return undefined;
+
+    // Check if entry has expired
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(key);
+      return undefined;
     }
+
     return entry.response;
   }
 
-  findSemantically(embedding: number[], threshold?: number): any | null {
-    const actualThreshold = threshold || this.similarityThreshold;
-    
-    let bestMatch: CacheEntry | null = null;
-    let highestSimilarity = 0;
-    
-    for (const entry of this.semanticCache) {
-      if (!entry.embedding || Date.now() > entry.expiresAt) continue;
-      
-      const similarity = cosineSimilarity(embedding, entry.embedding);
-      if (similarity > actualThreshold && similarity > highestSimilarity) {
-        highestSimilarity = similarity;
-        bestMatch = entry;
-      }
+  set(key: string, prompt: string, response: LLMResponse, embedding?: number[], ttl?: number): void {
+    const now = Date.now();
+    const expiresAt = now + (ttl || this.defaultTTL);
+
+    this.cache.set(key, { 
+      prompt, 
+      response, 
+      embedding,
+      timestamp: now,
+      expiresAt
+    });
+
+    if (embedding) {
+      this.semanticCache.push({ 
+        embedding, 
+        response,
+        timestamp: now,
+        expiresAt
+      });
     }
-    
-    return bestMatch ? bestMatch.response : null;
   }
 
-  private cleanupExpiredEntries(): void {
+  findSemantically(embedding: number[]): LLMResponse | undefined {
+    // Clear expired entries first
+    this.clearExpiredEntries();
+
+    // Simple implementation - in reality, you'd want to use a proper vector database
+    const threshold = 0.8;
+    for (const entry of this.semanticCache) {
+      const similarity = this.calculateCosineSimilarity(embedding, entry.embedding);
+      if (similarity >= threshold) {
+        return entry.response;
+      }
+    }
+    return undefined;
+  }
+
+  clearExpiredEntries(): void {
     const now = Date.now();
-    
-    // Clean regular cache
+
+    // Clear expired entries from regular cache
     for (const [key, entry] of this.cache.entries()) {
       if (now > entry.expiresAt) {
         this.cache.delete(key);
       }
     }
-    
-    // Clean semantic cache
+
+    // Clear expired entries from semantic cache
     this.semanticCache = this.semanticCache.filter(entry => now <= entry.expiresAt);
+  }
+
+  private calculateCosineSimilarity(vec1: number[], vec2: number[]): number {
+    if (vec1.length !== vec2.length) {
+      throw new Error('Vectors must be of the same length');
+    }
+
+    const dotProduct = vec1.reduce((sum, val, i) => sum + val * vec2[i], 0);
+    const magnitude1 = Math.sqrt(vec1.reduce((sum, val) => sum + val * val, 0));
+    const magnitude2 = Math.sqrt(vec2.reduce((sum, val) => sum + val * val, 0));
+
+    return dotProduct / (magnitude1 * magnitude2);
   }
 }
 

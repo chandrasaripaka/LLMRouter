@@ -1,72 +1,76 @@
 import { LLMProvider } from './base-provider';
-import { LLMResponse } from '../types';
-import axios from 'axios';
+import { LLMResponse, RequestOptions } from '../types';
 
 export class OpenAIProvider extends LLMProvider {
-  constructor(apiKey: string, modelName: string = 'gpt-4-turbo') {
+  constructor(apiKey: string, modelName: string = 'gpt-3.5-turbo') {
     super(apiKey, 'https://api.openai.com/v1', modelName);
   }
 
-  async generateCompletion(prompt: string, options: Record<string, any> = {}): Promise<LLMResponse> {
+  async generateCompletion(prompt: string, options: RequestOptions = {}): Promise<LLMResponse> {
     try {
-      const response = await axios.post(
-        `${this.baseUrl}/chat/completions`,
+      this.validatePrompt(prompt);
+
+      const response = await this.makeRequest<any>(
+        '/chat/completions',
+        'POST',
         {
           model: this.modelName,
           messages: [{ role: 'user', content: prompt }],
-          ...options
+          temperature: options.temperature || 0.7,
+          max_tokens: options.maxTokens,
+          top_p: options.topP,
+          frequency_penalty: options.frequencyPenalty,
+          presence_penalty: options.presencePenalty
         },
-        {
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json'
-          }
-        }
+        options
       );
 
       return {
-        content: response.data.choices[0].message.content,
-        modelUsed: this.modelName,
-        tokenUsage: {
-          input: response.data.usage.prompt_tokens,
-          output: response.data.usage.completion_tokens,
-          total: response.data.usage.total_tokens
+        text: response.choices[0].message.content,
+        model: this.modelName,
+        provider: 'openai',
+        usage: {
+          promptTokens: response.usage.prompt_tokens,
+          completionTokens: response.usage.completion_tokens,
+          totalTokens: response.usage.total_tokens
         },
         metadata: {
-          id: response.data.id,
-          created: response.data.created,
-          provider: 'openai'
+          id: response.id,
+          created: response.created
         }
       };
     } catch (error) {
-      throw new Error(`OpenAI API Error: ${error.message}`);
+      if (error instanceof Error) {
+        return this.createErrorResponse(error);
+      }
+      return this.createErrorResponse(new Error('An unknown error occurred'));
     }
   }
 
   async generateEmbedding(text: string): Promise<number[]> {
     try {
-      const response = await axios.post(
-        `${this.baseUrl}/embeddings`,
+      this.validatePrompt(text);
+
+      const response = await this.makeRequest<any>(
+        '/embeddings',
+        'POST',
         {
           model: 'text-embedding-3-small',
           input: text
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json'
-          }
         }
       );
 
-      return response.data.data[0].embedding;
+      return response.data[0].embedding;
     } catch (error) {
-      throw new Error(`OpenAI Embedding Error: ${error.message}`);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Failed to generate embedding');
     }
   }
 
   calculateTokens(text: string): { input: number; output?: number } {
-    // Simple approximation: ~4 chars per token
+    // Simple approximation: ~4 chars per token for English text
     const approxTokens = Math.ceil(text.length / 4);
     return { input: approxTokens };
   }

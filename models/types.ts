@@ -1,49 +1,66 @@
 // Dynamic LLM Router - A system to efficiently switch between different LLM providers
+// models/types.ts
 
 // Define the common response structure from any LLM provider
 export interface LLMResponse {
-    content: string;
-    modelUsed: string;
-    tokenUsage: {
-      input: number;
-      output: number;
-      total: number;
+    text: string;
+    model: string;
+    provider: string;
+    usage?: {
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
     };
-    metadata?: Record<string, any>;
+    metadata?: {
+      id?: string;
+      provider?: string;
+      created?: number;
+      [key: string]: any; // Allow additional metadata fields
+    };
   }
   
   // Define the complexity level of a prompt
   export enum TaskComplexity {
-    SIMPLE = 'simple',
-    MODERATE = 'moderate',
-    COMPLEX = 'complex'
+    SIMPLE = 'SIMPLE',
+    MODERATE = 'MODERATE',
+    COMPLEX = 'COMPLEX'
   }
   
   // Define the configuration for each model
   export interface ModelConfig {
     name: string;
     provider: string;
+    capabilities: ModelCapabilities;
     costPerInputToken: number;
     costPerOutputToken: number;
-    capabilities: {
-      reasoning: number;     // 0-10 rating
-      creativity: number;    // 0-10 rating
-      knowledge: number;     // 0-10 rating
-      speed: number;         // 0-10 rating (higher is faster)
-    };
-    apiConfig: Record<string, any>;
   }
   
   // Define the request options
   export interface RequestOptions {
-    preferredModel?: string;
     preferredProvider?: string;
+    preferredModel?: string;
+    minCapability?: Partial<ModelCapabilities>;
     maxCost?: number;
-    minCapability?: Record<string, number>;
-    timeoutMs?: number;
     fallbackStrategy?: 'cost-ascending' | 'capability-descending' | 'specific-models';
     fallbackModels?: string[];
+    timeoutMs?: number;
     cacheResults?: boolean;
+    headers?: Record<string, string>;
+    // OpenAI specific options
+    temperature?: number;
+    maxTokens?: number;
+    topP?: number;
+    frequencyPenalty?: number;
+    presencePenalty?: number;
+    // Claude specific options
+    maxTokensToSample?: number;
+    stopSequences?: string[];
+    // Gemini specific options
+    candidateCount?: number;
+    safetySettings?: Array<{
+      category: string;
+      threshold: string;
+    }>;
   }
   
   // Cache interface
@@ -53,4 +70,17 @@ export interface LLMResponse {
     response: LLMResponse;
     timestamp: number;
     expiresAt: number;
+  }
+
+  export interface ModelCapabilities {
+    speed: number;
+    knowledge: number;
+    reasoning: number;
+    creativity: number;
+  }
+
+  export interface TokenUsage {
+    input: number;
+    output: number;
+    total: number;
   }

@@ -1,62 +1,75 @@
-
 import { LLMProvider } from './base-provider';
-import { LLMResponse } from '../types';
-import axios from 'axios';
+import { LLMResponse, RequestOptions } from '../types';
 
 export class GeminiProvider extends LLMProvider {
-  constructor(apiKey: string, modelName: string = 'gemini-1.5-pro') {
-    super(apiKey, 'https://generativelanguage.googleapis.com/v1beta', modelName);
+  constructor(apiKey: string, modelName: string = 'gemini-1.5-flash') {
+    super(apiKey, 'https://generativelanguage.googleapis.com/v1', modelName);
   }
 
-  async generateCompletion(prompt: string, options: Record<string, any> = {}): Promise<LLMResponse> {
+  async generateCompletion(prompt: string, options: RequestOptions = {}): Promise<LLMResponse> {
     try {
-      const response = await axios.post(
-        `${this.baseUrl}/models/${this.modelName}:generateContent?key=${this.apiKey}`,
+      this.validatePrompt(prompt);
+
+      const response = await this.makeRequest<any>(
+        `/models/${this.modelName}:generateContent?key=${this.apiKey}`,
+        'POST',
         {
-          contents: [{ parts: [{ text: prompt }] }],
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: {
-            maxOutputTokens: options.max_tokens || 1024,
-            temperature: options.temperature || 0.7,
-            ...options
+            maxOutputTokens: options.maxTokens || 1024,
+            temperature: options.temperature,
+            topP: options.topP,
+            candidateCount: options.candidateCount,
+            safetySettings: options.safetySettings
           }
-        }
+        },
+        options
       );
 
       return {
-        content: response.data.candidates[0].content.parts[0].text,
-        modelUsed: this.modelName,
-        tokenUsage: {
-          input: response.data.usageMetadata?.promptTokenCount || 0,
-          output: response.data.usageMetadata?.candidatesTokenCount || 0,
-          total: (response.data.usageMetadata?.promptTokenCount || 0) + 
-                 (response.data.usageMetadata?.candidatesTokenCount || 0)
+        text: response.candidates[0].content.parts[0].text,
+        model: this.modelName,
+        provider: 'google',
+        usage: {
+          promptTokens: response.usage?.promptTokenCount || 0,
+          completionTokens: response.usage?.candidatesTokenCount || 0,
+          totalTokens: (response.usage?.promptTokenCount || 0) + (response.usage?.candidatesTokenCount || 0)
         },
         metadata: {
-          provider: 'google'
+          id: response.candidates[0].citationMetadata?.citationSources?.[0]?.uri || ''
         }
       };
     } catch (error) {
-      throw new Error(`Gemini API Error: ${error.message}`);
+      if (error instanceof Error) {
+        return this.createErrorResponse(error);
+      }
+      return this.createErrorResponse(new Error('An unknown error occurred'));
     }
   }
 
   async generateEmbedding(text: string): Promise<number[]> {
     try {
-      const response = await axios.post(
-        `${this.baseUrl}/models/embedding-001:embedContent?key=${this.apiKey}`,
+      this.validatePrompt(text);
+
+      const response = await this.makeRequest<any>(
+        `/models/${this.modelName}:embedContent?key=${this.apiKey}`,
+        'POST',
         {
-          content: { parts: [{ text: text }] }
+          content: { parts: [{ text }] }
         }
       );
 
-      return response.data.embedding.values;
+      return response.embedding.values;
     } catch (error) {
-      throw new Error(`Gemini Embedding Error: ${error.message}`);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Failed to generate embedding');
     }
   }
 
   calculateTokens(text: string): { input: number; output?: number } {
-    // Simple approximation: ~4 chars per token
+    // Simple approximation: ~4 chars per token for English text
     const approxTokens = Math.ceil(text.length / 4);
     return { input: approxTokens };
   }
