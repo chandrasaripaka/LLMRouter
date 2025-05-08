@@ -26,8 +26,7 @@ npm install
 cp .env.example .env
 # Edit .env with your API keys
 
-#Also if you feel like just running it after putting the keys below, there is a index.ts,
-which mimicks asking questions.,
+#Also if you feel like just running it after putting the keys below, there is a index.ts, which mimicks asking questions.,
 npm install
 npm start
 ```
